@@ -1,113 +1,177 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 <title>Rubbellos für dich ❤️</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <style>
-    body {
-        margin: 0;
-        height: 100vh;
-        background: linear-gradient(135deg, #ffb6c1, #ffe4e1);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-family: "Segoe UI", sans-serif;
-    }
-    #container {
-        position: relative;
-        width: 320px;
-        height: 220px;
-        border-radius: 18px;
-        overflow: hidden;
-        background: white;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.25);
-    }
-    #message {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-        padding: 20px;
-        box-sizing: border-box;
-    }
-    #message h2 {
-        margin: 0 0 10px;
-        color: #e75480;
-    }
-    #message p {
-        font-size: 20px;
-        font-weight: bold;
-    }
-    canvas {
-        position: absolute;
-        inset: 0;
-    }
+  :root { color-scheme: light; }
+  body {
+    margin: 0;
+    height: 100vh;
+    background: linear-gradient(135deg, #ffb6c1, #ffe4e1);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  #container {
+    position: relative;
+    width: 320px;
+    height: 220px;
+    border-radius: 18px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+  }
+  #message {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 20px;
+    box-sizing: border-box;
+    pointer-events: none; /* damit die Canvas alle Pointer-Events bekommt */
+  }
+  #message h2 {
+    margin: 0 0 10px;
+    color: #e75480;
+  }
+  #message p {
+    font-size: 20px;
+    font-weight: bold;
+  }
+  canvas#scratch {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;  /* WICHTIG: CSS-Größe füllt den Container */
+    display: block;
+  }
 </style>
 </head>
 <body>
 
 <div id="container">
-    <div id="message">
-        <h2>💖 Für meine wundervolle Frau 💖</h2>
-        <p>🎉 Glückwunsch!<br>Eine Fußmassage gewonnen 👣</p>
-    </div>
-    <canvas id="scratch"></canvas>
+  <div id="message">
+    <h2>💖 Für meine wundervolle Frau 💖</h2>
+    <p>🎉 Glückwunsch!<br>Eine Fußmassage gewonnen 👣</p>
+  </div>
+  <canvas id="scratch"></canvas>
 </div>
 
 <script>
-const canvas = document.getElementById("scratch");
-const ctx = canvas.getContext("2d");
+(function () {
+  const canvas = document.getElementById("scratch");
+  const ctx = canvas.getContext("2d", { willReadFrequently: false });
 
-canvas.width = canvas.offsetWidth;
-canvas.height = canvas.offsetHeight;
+  let isDrawing = false;
+  let scale = 1; // Verhältnis von interner Canvas-Größe zu CSS-Größe
 
-ctx.fillStyle = "#d3d3d3";
-ctx.fillRect(0, 0, canvas.width, canvas.height);
+  function resizeCanvas() {
+    // CSS-Größe
+    const cssW = canvas.clientWidth;
+    const cssH = canvas.clientHeight;
 
-ctx.font = "22px Segoe UI";
-ctx.fillStyle = "#555";
-ctx.textAlign = "center";
-ctx.fillText("Hier freirubbeln ✨", canvas.width / 2, canvas.height / 2);
+    // Gerätepixel-Verhältnis berücksichtigen (scharfe Darstellung auf HiDPI)
+    const dpr = window.devicePixelRatio || 1;
 
-ctx.globalCompositeOperation = "destination-out";
+    // Interne Zeichenfläche anpassen
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
 
-let isDrawing = false;
+    // Zeichenkontext zurücksetzen und skalieren
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
 
-canvas.addEventListener("mousedown", () => isDrawing = true);
-canvas.addEventListener("mouseup", () => isDrawing = false);
-canvas.addEventListener("mousemove", draw);
+    // Skalfaktor für Pointer-Koordinaten
+    scale = dpr;
 
-canvas.addEventListener("touchstart", () => isDrawing = true);
-canvas.addEventListener("touchend", () => isDrawing = false);
-canvas.addEventListener("touchmove", drawTouch);
+    drawCover(); // Deckschicht neu zeichnen
+  }
 
-function draw(e) {
-    if (!isDrawing) return;
+  function drawCover() {
+    // komplette Fläche füllen (in CSS-Pixeln zeichnen, da Kontext skaliert ist)
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "#d3d3d3";
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.font = "22px Segoe UI, system-ui, -apple-system, sans-serif";
+    ctx.fillStyle = "#555";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Hier freirubbeln ✨", w / 2, h / 2);
+
+    // Ab jetzt „wegradieren“
+    ctx.globalCompositeOperation = "destination-out";
+  }
+
+  function posFromEvent(e) {
+    const rect = canvas.getBoundingClientRect();
+    if (e.touches && e.touches[0]) {
+      const t = e.touches[0];
+      return {
+        x: (t.clientX - rect.left),
+        y: (t.clientY - rect.top)
+      };
+    } else {
+      return {
+        x: (e.clientX - rect.left),
+        y: (e.clientY - rect.top)
+      };
+    }
+  }
+
+  function scratchAt(x, y) {
+    // Radius in CSS-Pixeln (der Kontext ist bereits skaliert)
+    const r = 20;
     ctx.beginPath();
-    ctx.arc(e.offsetX, e.offsetY, 20, 0, Math.PI * 2);
+    ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
-}
+  }
 
-function drawTouch(e) {
+  // Pointer-Events (Maus)
+  canvas.addEventListener("mousedown", (e) => {
+    isDrawing = true;
+    const p = posFromEvent(e);
+    scratchAt(p.x, p.y);
+  });
+  window.addEventListener("mouseup", () => (isDrawing = false));
+  canvas.addEventListener("mousemove", (e) => {
+    if (!isDrawing) return;
+    const p = posFromEvent(e);
+    scratchAt(p.x, p.y);
+  });
+
+  // Touch-Events
+  canvas.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    isDrawing = true;
+    const p = posFromEvent(e);
+    scratchAt(p.x, p.y);
+  }, { passive: false });
+
+  window.addEventListener("touchend", () => (isDrawing = false));
+  canvas.addEventListener("touchmove", (e) => {
     e.preventDefault();
     if (!isDrawing) return;
-    const rect = canvas.getBoundingClientRect();
-    const touch = e.touches[0];
-    ctx.beginPath();
-    ctx.arc(
-        touch.clientX - rect.left,
-        touch.clientY - rect.top,
-        20,
-        0,
-        Math.PI * 2
-    );
-    ctx.fill();
-}
+    const p = posFromEvent(e);
+    scratchAt(p.x, p.y);
+  }, { passive: false });
+
+  // Initialisierung & Resize
+  window.addEventListener("resize", resizeCanvas);
+  // Warten, bis Layout steht (sicher bei GitHub Pages)
+  window.requestAnimationFrame(resizeCanvas);
+})();
 </script>
 
 </body>
 </html>
+``
